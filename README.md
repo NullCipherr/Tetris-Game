@@ -1,6 +1,10 @@
+<div align="center">
+
 # 🕹️ Tetris 3D
 
 ![Tetris 3D Logo](https://seeklogo.com/images/T/tetris-logo-5F5DFBCE21-seeklogo.com.png)
+
+</div>
 
 ## 📖 Sobre o Projeto
 
