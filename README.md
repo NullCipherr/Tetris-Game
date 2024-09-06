@@ -1,6 +1,6 @@
 # 🕹️ Tetris 3D
 
-![Tetris 3D Logo](https://via.placeholder.com/150?text=Tetris+3D)
+![Tetris 3D Logo](https://seeklogo.com/images/T/tetris-logo-5F5DFBCE21-seeklogo.com.png)
 
 ## 📖 Sobre o Projeto
 
@@ -30,11 +30,6 @@ Tetris 3D é uma versão moderna e visualmente atraente do clássico jogo Tetris
 - HTML5
 - CSS3
 - JavaScript
-
-## 📸 Capturas de Tela
-
-![Captura de Tela 1](https://via.placeholder.com/300x200?text=Screenshot+1)
-![Captura de Tela 2](https://via.placeholder.com/300x200?text=Screenshot+2)
 
 ## 🤝 Contribuindo
 
