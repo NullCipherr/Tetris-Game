@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris 3D</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            font-family: 'Courier New', monospace;
+            color: white;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .logo {
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0px rgba(255,0,0,0.7), 
+                         4px 4px 0px rgba(162, 0, 255, 0.7), 
+                         6px 6px 0px rgba(162, 0, 255, 0.7);
+            background: linear-gradient(to bottom, #FFFFFF, #aaaaaa1a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 5px #FFF);
+        }
+        @supports (-webkit-text-stroke: 1px black) {
+            .logo {
+                -webkit-text-stroke: .5px rgba(255, 255, 255, 0.644);
+                text-stroke: 1px rgb(255, 255, 255);
+            }
+        }
+        #game-board {
+            border: 2px solid #8B00FF;
+            box-shadow: 0 0 10px #8B00FF, 0 0 20px #8B00FF, 0 0 30px #8B00FF;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #8B00FF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #6A0DAD;
+        }
+        #score {
+            font-size: 24px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="logo">TETRIS</div>
+        <canvas id="game-board"></canvas>
+        <div id="score">Pontuação: 0</div>
+        <div class="controls">
+            <button id="start-btn">Iniciar</button>
+            <button id="pause-btn">Pausar</button>
+        </div>
+    </div>
+
+    <script>
+        // Obtém referências aos elementos do DOM
+        const canvas = document.getElementById('game-board');
+        const ctx = canvas.getContext('2d', { antialias: true });
+        const scoreElement = document.getElementById('score');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+
+        // Define as constantes do jogo
+        const ROWS = 20;
+        const COLS = 10;
+        const BLOCK_SIZE = 30;
+
+        // Define o tamanho do canvas
+        canvas.width = COLS * BLOCK_SIZE;
+        canvas.height = ROWS * BLOCK_SIZE;
+
+        // Define as formas das peças do Tetris
+        const SHAPES = [
+            [[1, 1, 1, 1]],           // I
+            [[1, 1], [1, 1]],         // O
+            [[1, 1, 1], [0, 1, 0]],   // T
+            [[1, 1, 1], [1, 0, 0]],   // L
+            [[1, 1, 1], [0, 0, 1]],   // J
+            [[0, 1, 1], [1, 1, 0]],   // S
+            [[1, 1, 0], [0, 1, 1]]    // Z
+        ];
+
+        // Define as cores das peças
+        const COLORS = ['#00FFFF', '#FFFF00', '#800080', '#FFA500', '#0000FF', '#00FF00', '#FF0000'];
+
+        // Inicializa variáveis do jogo
+        let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        let currentPiece = null;
+        let currentColor = '';
+        let currentX = 0;
+        let currentY = 0;
+        let score = 0;
+        let gameInterval = null;
+        let isPaused = false;
+
+        // Atualiza a pontuação na tela
+        function updateScore() {
+            scoreElement.textContent = `Pontuação: ${score}`;
+        }
+
+        // Cria uma nova peça aleatória
+        function newPiece() {
+            const shapeIndex = Math.floor(Math.random() * SHAPES.length);
+            const shape = SHAPES[shapeIndex];
+            currentPiece = shape;
+            currentColor = COLORS[shapeIndex];
+            currentX = Math.floor(COLS / 2) - Math.floor(shape[0].length / 2);
+            currentY = 0;
+
+            if (collision()) {
+                alert('Fim de jogo! Pontuação: ' + score);
+                resetGame();
+            }
+        }
+
+        // Reinicia o jogo
+        function resetGame() {
+            board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            score = 0;
+            updateScore();
+            newPiece();
+        }
+
+        // Desenha um bloco 3D
+        function draw3DBlock(x, y, color) {
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            
+            // Borda superior clara
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo((x + 1) * BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo((x + 0.9) * BLOCK_SIZE, (y + 0.1) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.1) * BLOCK_SIZE, (y + 0.1) * BLOCK_SIZE);
+            ctx.closePath();
+            ctx.fill();
+
+            // Borda esquerda clara
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo(x * BLOCK_SIZE, (y + 1) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.1) * BLOCK_SIZE, (y + 0.9) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.1) * BLOCK_SIZE, (y + 0.1) * BLOCK_SIZE);
+            ctx.closePath();
+            ctx.fill();
+
+            // Borda inferior escura
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.moveTo(x * BLOCK_SIZE, (y + 1) * BLOCK_SIZE);
+            ctx.lineTo((x + 1) * BLOCK_SIZE, (y + 1) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.9) * BLOCK_SIZE, (y + 0.9) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.1) * BLOCK_SIZE, (y + 0.9) * BLOCK_SIZE);
+            ctx.closePath();
+            ctx.fill();
+
+            // Borda direita escura
+            ctx.beginPath();
+            ctx.moveTo((x + 1) * BLOCK_SIZE, y * BLOCK_SIZE);
+            ctx.lineTo((x + 1) * BLOCK_SIZE, (y + 1) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.9) * BLOCK_SIZE, (y + 0.9) * BLOCK_SIZE);
+            ctx.lineTo((x + 0.9) * BLOCK_SIZE, (y + 0.1) * BLOCK_SIZE);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Desenha o tabuleiro e a peça atual
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Desenhar o tabuleiro
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (board[y][x]) {
+                        draw3DBlock(x, y, board[y][x]);
+                    }
+                }
+            }
+            
+            // Desenhar a peça atual
+            if (currentPiece) {
+                for (let y = 0; y < currentPiece.length; y++) {
+                    for (let x = 0; x < currentPiece[y].length; x++) {
+                        if (currentPiece[y][x]) {
+                            draw3DBlock(currentX + x, currentY + y, currentColor);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Move a peça para baixo
+        function moveDown() {
+            currentY++;
+            if (collision()) {
+                currentY--;
+                merge();
+                removeFullRows();
+                newPiece();
+            }
+        }
+
+        // Move a peça para a esquerda
+        function moveLeft() {
+            currentX--;
+            if (collision()) {
+                currentX++;
+            }
+        }
+
+        // Move a peça para a direita
+        function moveRight() {
+            currentX++;
+            if (collision()) {
+                currentX--;
+            }
+        }
+
+        // Rotaciona a peça
+        function rotate() {
+            const rotated = currentPiece[0].map((_, index) => 
+                currentPiece.map(row => row[index])
+            ).reverse();
+            if (!collision(0, 0, rotated)) {
+                currentPiece = rotated;
+            }
+        }
+
+        // Verifica colisões
+        function collision() {
+            for (let y = 0; y < currentPiece.length; y++) {
+                for (let x = 0; x < currentPiece[y].length; x++) {
+                    if (currentPiece[y][x] && 
+                        ((board[y + currentY] && board[y + currentY][x + currentX]) !== 0 ||
+                        currentX + x < 0 ||
+                        currentX + x >= COLS ||
+                        currentY + y >= ROWS)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Mescla a peça atual com o tabuleiro
+        function merge() {
+            for (let y = 0; y < currentPiece.length; y++) {
+                for (let x = 0; x < currentPiece[y].length; x++) {
+                    if (currentPiece[y][x]) {
+                        board[y + currentY][x + currentX] = currentColor;
+                    }
+                }
+            }
+        }
+
+        // Remove linhas completas e atualiza a pontuação
+        function removeFullRows() {
+            for (let y = ROWS - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(COLS).fill(0));
+                    score += 100;
+                    updateScore();
+                }
+            }
+        }
+
+        // Loop principal do jogo
+        function gameLoop() {
+            moveDown();
+            draw();
+        }
+
+        // Adiciona eventos de teclado para controlar o jogo
+        document.addEventListener('keydown', (e) => {
+            if (!isPaused) {
+                if (e.key === 'ArrowLeft') moveLeft();
+                if (e.key === 'ArrowRight') moveRight();
+                if (e.key === 'ArrowDown') moveDown();
+                if (e.key === 'ArrowUp') rotate();
+                draw();
+            }
+        });
+
+        // Adiciona evento de clique ao botão de iniciar/reiniciar
+        startBtn.addEventListener('click', () => {
+            if (!gameInterval) {
+                resetGame();
+                gameInterval = setInterval(gameLoop, 500);
+                startBtn.textContent = 'Reiniciar';
+            } else {
+                clearInterval(gameInterval);
+                resetGame();
+                gameInterval = setInterval(gameLoop, 500);
+            }
+        });
+
+        // Adiciona evento de clique ao botão de pausar/continuar
+        pauseBtn.addEventListener('click', () => {
+            if (isPaused) {
+                gameInterval = setInterval(gameLoop, 500);
+                pauseBtn.textContent = 'Pausar';
+                isPaused = false;
+            } else {
+                clearInterval(gameInterval);
+                pauseBtn.textContent = 'Continuar';
+                isPaused = true;
+            }
+        });
+
+        // Inicialização do jogo
+        resetGame();
+        draw();
+    </script>
+</body>
+</html>
