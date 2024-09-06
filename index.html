@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tetris 3D</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             display: flex;
@@ -60,6 +61,9 @@
         button:hover {
             background-color: #6A0DAD;
         }
+        button i {
+            margin-right: 5px;
+        }
         #score {
             font-size: 24px;
             margin-top: 20px;
@@ -72,8 +76,8 @@
         <canvas id="game-board"></canvas>
         <div id="score">Pontuação: 0</div>
         <div class="controls">
-            <button id="start-btn">Iniciar</button>
-            <button id="pause-btn">Pausar</button>
+            <button id="start-btn"><i class="fas fa-play"></i>Iniciar</button>
+            <button id="pause-btn"><i class="fas fa-pause"></i>Pausar</button>
         </div>
     </div>
 
@@ -117,6 +121,27 @@
         let score = 0;
         let gameInterval = null;
         let isPaused = false;
+
+        // Crie um único contexto de áudio para todo o jogo
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Função para criar e tocar um som
+        function playSound(frequency, duration) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.01);
+            gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
 
         // Atualiza a pontuação na tela
         function updateScore() {
@@ -230,6 +255,8 @@
                 merge();
                 removeFullRows();
                 newPiece();
+            } else {
+                playSound(220, 0.1); // Som de movimento
             }
         }
 
@@ -238,6 +265,8 @@
             currentX--;
             if (collision()) {
                 currentX++;
+            } else {
+                playSound(220, 0.1); // Som de movimento
             }
         }
 
@@ -246,6 +275,8 @@
             currentX++;
             if (collision()) {
                 currentX--;
+            } else {
+                playSound(220, 0.1); // Som de movimento
             }
         }
 
@@ -256,6 +287,7 @@
             ).reverse();
             if (!collision(0, 0, rotated)) {
                 currentPiece = rotated;
+                playSound(330, 0.1); // Som de rotação
             }
         }
 
@@ -288,13 +320,18 @@
 
         // Remove linhas completas e atualiza a pontuação
         function removeFullRows() {
+            let rowsRemoved = 0;
             for (let y = ROWS - 1; y >= 0; y--) {
                 if (board[y].every(cell => cell !== 0)) {
                     board.splice(y, 1);
                     board.unshift(Array(COLS).fill(0));
                     score += 100;
-                    updateScore();
+                    rowsRemoved++;
                 }
+            }
+            if (rowsRemoved > 0) {
+                playSound(440, 0.2); // Som de remoção de linha
+                updateScore();
             }
         }
 
@@ -317,10 +354,11 @@
 
         // Adiciona evento de clique ao botão de iniciar/reiniciar
         startBtn.addEventListener('click', () => {
+            resumeAudio();
             if (!gameInterval) {
                 resetGame();
                 gameInterval = setInterval(gameLoop, 500);
-                startBtn.textContent = 'Reiniciar';
+                startBtn.innerHTML = '<i class="fas fa-redo"></i>Reiniciar';
             } else {
                 clearInterval(gameInterval);
                 resetGame();
@@ -330,16 +368,27 @@
 
         // Adiciona evento de clique ao botão de pausar/continuar
         pauseBtn.addEventListener('click', () => {
+            resumeAudio();
             if (isPaused) {
                 gameInterval = setInterval(gameLoop, 500);
-                pauseBtn.textContent = 'Pausar';
+                pauseBtn.innerHTML = '<i class="fas fa-pause"></i>Pausar';
                 isPaused = false;
             } else {
                 clearInterval(gameInterval);
-                pauseBtn.textContent = 'Continuar';
+                pauseBtn.innerHTML = '<i class="fas fa-play"></i>Continuar';
                 isPaused = true;
             }
         });
+
+        // Adicione esta função para garantir que o contexto de áudio seja retomado após uma pausa
+        function resumeAudio() {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // Adicione este event listener para garantir que o áudio seja retomado em interações do usuário
+        document.addEventListener('click', resumeAudio);
 
         // Inicialização do jogo
         resetGame();

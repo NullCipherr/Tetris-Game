@@ -1,6 +1,6 @@
-<div align="center">
-
 # 🕹️ Tetris 3D
+
+<div align="center">
 
 ![Tetris 3D Logo](https://seeklogo.com/images/T/tetris-logo-5F5DFBCE21-seeklogo.com.png)
 
@@ -41,7 +41,7 @@ Contribuições são bem-vindas! Sinta-se à vontade para abrir uma issue ou env
 
 ## 📄 Licença
 
-Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE.md](LICENSE.md) para detalhes.
+Este projeto está licenciado sob a Licença MIT.
 
 ## 👏 Agradecimentos
 
