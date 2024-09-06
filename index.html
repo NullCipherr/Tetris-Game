@@ -68,6 +68,9 @@
             font-size: 24px;
             margin-top: 20px;
         }
+        .ghost {
+            opacity: 0.3;
+        }
     </style>
 </head>
 <body>
@@ -165,10 +168,16 @@
 
         // Reinicia o jogo
         function resetGame() {
+            clearInterval(gameInterval);
+            gameInterval = null;
+            isPaused = false;
             board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
             score = 0;
             updateScore();
             newPiece();
+            draw();
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i>Pausar';
+            pauseBtn.disabled = true;
         }
 
         // Desenha um bloco 3D
@@ -223,25 +232,58 @@
 
         // Desenha o tabuleiro e a peça atual
         function draw() {
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Desenhar o tabuleiro
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoard();
+            drawGhostPiece();
+            drawPiece(currentPiece, currentX, currentY, currentColor);
+        }
+
+        // Adicione esta função para calcular a posição da peça fantasma
+        function calculateGhostPosition() {
+            let ghostY = currentY;
+            while (!collision(currentX, ghostY + 1)) {
+                ghostY++;
+            }
+            return ghostY;
+        }
+
+        // Adicione esta nova função para desenhar a peça fantasma
+        function drawGhostPiece() {
+            const ghostY = calculateGhostPosition();
+            ctx.globalAlpha = 0.3;
+            currentPiece.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        ctx.fillStyle = currentColor;
+                        ctx.fillRect((currentX + x) * BLOCK_SIZE, (ghostY + y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                        ctx.strokeStyle = 'white';
+                        ctx.strokeRect((currentX + x) * BLOCK_SIZE, (ghostY + y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    }
+                });
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // Modifique a função drawPiece para aceitar coordenadas
+        function drawPiece(piece, x, y, color) {
+            piece.forEach((row, dy) => {
+                row.forEach((value, dx) => {
+                    if (value !== 0) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect((x + dx) * BLOCK_SIZE, (y + dy) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                        ctx.strokeStyle = 'black';
+                        ctx.strokeRect((x + dx) * BLOCK_SIZE, (y + dy) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    }
+                });
+            });
+        }
+
+        // Desenha o tabuleiro
+        function drawBoard() {
             for (let y = 0; y < ROWS; y++) {
                 for (let x = 0; x < COLS; x++) {
                     if (board[y][x]) {
                         draw3DBlock(x, y, board[y][x]);
-                    }
-                }
-            }
-            
-            // Desenhar a peça atual
-            if (currentPiece) {
-                for (let y = 0; y < currentPiece.length; y++) {
-                    for (let x = 0; x < currentPiece[y].length; x++) {
-                        if (currentPiece[y][x]) {
-                            draw3DBlock(currentX + x, currentY + y, currentColor);
-                        }
                     }
                 }
             }
@@ -258,6 +300,7 @@
             } else {
                 playSound(220, 0.1); // Som de movimento
             }
+            draw();
         }
 
         // Move a peça para a esquerda
@@ -268,6 +311,7 @@
             } else {
                 playSound(220, 0.1); // Som de movimento
             }
+            draw();
         }
 
         // Move a peça para a direita
@@ -278,6 +322,7 @@
             } else {
                 playSound(220, 0.1); // Som de movimento
             }
+            draw();
         }
 
         // Rotaciona a peça
@@ -285,21 +330,29 @@
             const rotated = currentPiece[0].map((_, index) => 
                 currentPiece.map(row => row[index])
             ).reverse();
-            if (!collision(0, 0, rotated)) {
+            if (!collision(currentX, currentY, rotated)) {
                 currentPiece = rotated;
                 playSound(330, 0.1); // Som de rotação
             }
+            draw();
         }
 
         // Verifica colisões
-        function collision() {
-            for (let y = 0; y < currentPiece.length; y++) {
-                for (let x = 0; x < currentPiece[y].length; x++) {
-                    if (currentPiece[y][x] && 
-                        ((board[y + currentY] && board[y + currentY][x + currentX]) !== 0 ||
-                        currentX + x < 0 ||
-                        currentX + x >= COLS ||
-                        currentY + y >= ROWS)) {
+        function collision(x = currentX, y = currentY, piece = currentPiece) {
+            for (let r = 0; r < piece.length; r++) {
+                for (let c = 0; c < piece[r].length; c++) {
+                    if (!piece[r][c]) {
+                        continue;
+                    }
+                    let newX = x + c;
+                    let newY = y + r;
+                    if (newX < 0 || newX >= COLS || newY >= ROWS) {
+                        return true;
+                    }
+                    if (newY < 0) {
+                        continue;
+                    }
+                    if (board[newY][newX] !== 0) {
                         return true;
                     }
                 }
@@ -338,7 +391,7 @@
         // Loop principal do jogo
         function gameLoop() {
             moveDown();
-            draw();
+            updateButtonStates();
         }
 
         // Adiciona eventos de teclado para controlar o jogo
@@ -359,8 +412,8 @@
                 resetGame();
                 gameInterval = setInterval(gameLoop, 500);
                 startBtn.innerHTML = '<i class="fas fa-redo"></i>Reiniciar';
+                pauseBtn.disabled = false;
             } else {
-                clearInterval(gameInterval);
                 resetGame();
                 gameInterval = setInterval(gameLoop, 500);
             }
@@ -369,16 +422,29 @@
         // Adiciona evento de clique ao botão de pausar/continuar
         pauseBtn.addEventListener('click', () => {
             resumeAudio();
-            if (isPaused) {
-                gameInterval = setInterval(gameLoop, 500);
-                pauseBtn.innerHTML = '<i class="fas fa-pause"></i>Pausar';
-                isPaused = false;
-            } else {
-                clearInterval(gameInterval);
-                pauseBtn.innerHTML = '<i class="fas fa-play"></i>Continuar';
-                isPaused = true;
+            if (gameInterval) {
+                if (isPaused) {
+                    gameInterval = setInterval(gameLoop, 500);
+                    pauseBtn.innerHTML = '<i class="fas fa-pause"></i>Pausar';
+                    isPaused = false;
+                } else {
+                    clearInterval(gameInterval);
+                    pauseBtn.innerHTML = '<i class="fas fa-play"></i>Continuar';
+                    isPaused = true;
+                }
             }
         });
+
+        // Adicione esta função para atualizar o estado dos botões
+        function updateButtonStates() {
+            if (gameInterval) {
+                startBtn.innerHTML = '<i class="fas fa-redo"></i>Reiniciar';
+                pauseBtn.disabled = false;
+            } else {
+                startBtn.innerHTML = '<i class="fas fa-play"></i>Iniciar';
+                pauseBtn.disabled = true;
+            }
+        }
 
         // Adicione esta função para garantir que o contexto de áudio seja retomado após uma pausa
         function resumeAudio() {
